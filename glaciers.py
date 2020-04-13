@@ -9,21 +9,26 @@ l8dir = '~/Sync/msc_course/dissertation/data/landsat-8/'
 aoidir = '/Users/robwebster/Sync/msc_course/dissertation/data/aoi/'
 
 aoi_json = os.path.join(aoidir, 'sg_aoi.geojson')
-print(aoi_json)
+#print(aoi_json)
 
 # connect to the API
 api = SentinelAPI(None, None)
 
 # search by polygon, time, and SciHub query keywords
 footprint = geojson_to_wkt(read_geojson(aoi_json))
-products = api.query(footprint, date=('20200101', 'NOW'), platformname='Sentinel-1', producttype='SLC', sensoroperationalmode='IW')
+products = api.query(footprint, date=('20200301', 'NOW'), platformname='Sentinel-1', producttype='GRD', sensoroperationalmode='IW')
+
+# Pandas dataframe
+df = api.to_dataframe(products)
 
 # GeoPandas GeoDataFrame with the metadata of the scenes and the footprints as geometries
-df = api.to_dataframe(products)
 geodf = api.to_geodataframe(products)
 
-#print(df['title'])
-#print(geodf['title'])
+#print(df.columns)
+#print(geodf.columns)
 
-for id in df['uuid']:
-    print(api.get_product_odata(id)['Online'])
+#print(geodf['producttype'])
+print(geodf['title'])
+
+for id in geodf['uuid']:
+    print(f"Product: {api.get_product_odata(id)['title']}  (Online: {api.get_product_odata(id)['Online']})")
