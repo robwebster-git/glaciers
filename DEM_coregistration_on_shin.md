@@ -16,7 +16,9 @@ Conda Environment:
 
 Paths to Scripts:
 `/home/s0092179/src/demcoreg/demcoreg`
+
 `/home/s0092179/src/imview/imview`
+
 `/home/s0092179/src/pygeotools/pygeotools`
 
 For `dem_coreg.sh` only:
@@ -95,6 +97,7 @@ The relevant part of the code is `rgi_fn = os.path.join(datadir, 'rgi60/regions/
 Then you can run the program.  Example usage:
 
 `dem_mask.py --glaciers --outdir masked_dems source_dem.tif`
+
 `dem_mask.py --glaciers --outdir masked_dems reference_dem.tif`
 
 This produces some extra files in the specified directory (`source_dem_warp.tif`, `source_dem_ref.tif` and so on).  For some reason you have to specify an output directory, and then move the outputs back into the same directory as the DEMs you want to coregister.
