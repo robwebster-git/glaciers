@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-#import shapely
 from shapely.ops import split
 from shapely.geometry import LineString, Polygon, shape, mapping
 import os
@@ -9,7 +8,6 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.dates import YearLocator
 import fiona
-#import geopandas as gpd
 import sys
 from pprint import pprint
 from datetime import datetime as dt
@@ -47,8 +45,6 @@ def box_process(boxfile, linesfile, outpath, w, invert):
             # Dummy variable to be updated by search for earliest year
             sorted_years = sorted(get_years(lines))
             earliest_year = sorted_years[0]
-
-            #print("Earliest record for this glacier is from", earliest_year, '\n')
             
             # Update the lines schema to include new attributes, ready for writing out new shapefile
             updated_schema = lines.schema
@@ -59,14 +55,8 @@ def box_process(boxfile, linesfile, outpath, w, invert):
             # so need to update the geometry type for the new layer to Polygon
             updated_schema['geometry'] = 'Polygon'
             
-            # Display details of the schema
-            #pprint(updated_schema)
-            
             # Open a connection to a new shapefile for writing the outputs
             with fiona.open(out_filepath,'w', driver='ESRI Shapefile', crs=box.crs,schema=updated_schema) as ouput:
-                
-                #print("Box CRS - ", box.crs['init'])
-                #print("Lines CRS - ", lines.crs['init'], '\n')
                 
                 if not box.crs['init'] == lines.crs['init']:
                     print('CRS of input layers do not match!')
@@ -105,7 +95,7 @@ def box_process(boxfile, linesfile, outpath, w, invert):
                             
                             # Update the various lists to hold results for this iteration
                             current_year.append(line['properties']['year'])
-                            new_polygons.append(result)
+                            new_polygons.append(correct_polygon)
                             avgm_values.append(avgm)
                             new_lines.append(line)
                             
@@ -114,7 +104,6 @@ def box_process(boxfile, linesfile, outpath, w, invert):
                             if year == earliest_year:
                                 sorted_years.pop(0)
                                 earliest_year = sorted_years[0]
-                                #print(f'There was a problem with the earliest record.  New earliest record set to {earliest_year}')
                 
                     except:
                         print('Unable to create Shapely geometry from line co-ordinates')
@@ -123,9 +112,6 @@ def box_process(boxfile, linesfile, outpath, w, invert):
                 for line, result in zip(new_lines, new_polygons):
                     try:
                         line['properties']['rel_posn'] = (line['properties']['measurement']) - zero_position
-                        
-                        # Toggle This For Troubleshooting New Glaciers
-                        #pprint(line['properties'])
                         
                         # If 'w' flag is true, the shapefile will be written to disk
                         if w:
@@ -165,7 +151,7 @@ def show_result_image(new_polygons, current_year):
     #ax.plot(*shapely_test_line.xy)
 
     for poly, year in total:
-        ax.plot(*poly[1].exterior.xy, alpha=0.3)
+        ax.plot(*poly.exterior.xy, alpha=0.3)
 
     plt.show()
 
@@ -175,7 +161,7 @@ def write_result_image(new_polygons, current_year, current_glacier, outpath):
     total = zip(new_polygons, current_year)
 
     for poly, year in total:
-        ax.plot(*poly[0].exterior.xy, alpha=0.4)
+        ax.plot(*poly.exterior.xy, alpha=0.4)
 
     ax.set_title(f'{current_glacier}')
 
@@ -230,11 +216,9 @@ def write_graph(new_polygons, new_lines, outpath, df):
     fig, ax = plt.subplots(figsize=(10, 6))
     glacier = new_lines[0]['properties']['gl_name']
  
-    ax.set_xlabel('Year', fontsize=20)
-    ax.set_ylabel('Frontal position change (metres)', fontsize=20)
-    ax.set_title(f'Approximate frontal positions relative to earliest record\n({glacier})', fontsize=20)
-
-    #ax.grid()
+    ax.set_xlabel('Year', fontsize=14)
+    ax.set_ylabel('Frontal position change (metres)', fontsize=14)
+    ax.set_title(f'Approximate frontal positions relative to earliest record\n({glacier})', fontsize=16)
 
     x_startdate = dt(1950, 1, 1)
     x_enddate = dt(2030,1,1)
@@ -273,10 +257,6 @@ def write_graph(new_polygons, new_lines, outpath, df):
 @click.option('--write_csv', is_flag=True, default=False, help='If set, writes certain data from all glaciers to csv')
 @click.option('--invert', is_flag=True, default=False, help='If set, the program thinks the other side of the split lines is the important polygon.  Sometimes needed for curvilinear boxes.  Rectinlinear boxes should not need it if the box has been drawn starting on the upstream part of the glacier')
 def main(boxes_path, lines_path, outpath, w, show_result_images, show_graphs, write_result_images, write_graphs, write_csv, invert):
-    
-    if not (w==True):
-            print('You will not write out the shapefiles')
-            #sys.exit()
 
     all_boxfiles = glob.glob(os.path.join(boxes_path, '*.shp'))
     df_all = pd.DataFrame()
