@@ -1,35 +1,20 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import shapely
+#import shapely
 from shapely.ops import split
 from shapely.geometry import LineString, Polygon, shape, mapping
 import os
 import pandas as pd
 from matplotlib import pyplot as plt
+from matplotlib.dates import YearLocator
 import fiona
-import geopandas as gpd
+#import geopandas as gpd
 import sys
 from pprint import pprint
 from datetime import datetime as dt
 import glob
 import click
-
-#basepath = os.path.join('/Users','robwebster','Sync','msc_course','dissertation', 'data', 'new_glacier_fronts')
-#boxfile = os.path.join(basepath, 'boxes_by_glacier_name_curve', glacier_name)
-#boxes_path = os.path.join(basepath, 'boxes_by_glacier_name_curve')
-##lines_path = os.path.join(basepath, 'fronts_by_glacier_name_curve')
-#linesfile = os.path.join(basepath, 'fronts_by_glacier_name_curve', glacier_name)
-#outpath = os.path.join(basepath, 'box_method_files', 'tests')
-
-
-def get_earliest_year(lines):
-    #  Loops through a line layer and returns the earliest year
-    early = 2030
-    for line in lines:
-        if line['properties']['year'] < early:
-            early = line['properties']['year']
-    return early
 
 
 def get_years(lines):
@@ -40,7 +25,7 @@ def get_years(lines):
     return all_years
 
 
-def box_process(boxfile, linesfile, outpath, w):
+def box_process(boxfile, linesfile, outpath, w, invert):
     new_polygons = []
     new_lines = []
     avgm_values = []
@@ -56,7 +41,7 @@ def box_process(boxfile, linesfile, outpath, w):
 
             print('Processing : ', current_glacier)
             
-            fn = current_glacier.lower().split(' glaci')[0].lower()
+            fn = current_glacier.lower().split(' glaci')[0]
             out_filepath = os.path.join(outpath, f'{fn}_boxresults.shp')
             
             # Dummy variable to be updated by search for earliest year
@@ -104,7 +89,12 @@ def box_process(boxfile, linesfile, outpath, w):
                             # Calculate the average front position measurement by dividing resulting polygon
                             # area by the width of the rectilinear box
                             
-                            avgm = result[0].area/boxwidth
+                            if invert:
+                                correct_polygon = result[1]
+                                avgm = correct_polygon.area/boxwidth
+                            else:
+                                correct_polygon = result[0]
+                                avgm = correct_polygon.area/boxwidth
                             
                             # Update the attributes to include this new measurement
                             line['properties']['measurement'] = int(avgm)
@@ -139,7 +129,7 @@ def box_process(boxfile, linesfile, outpath, w):
                         
                         # If 'w' flag is true, the shapefile will be written to disk
                         if w:
-                            ouput.write({'geometry':mapping(result[0]),'properties': line['properties']})
+                            ouput.write({'geometry':mapping(correct_polygon),'properties': line['properties']})
                     except:
                         print(f'Error processing {current_glacier}')
                 
@@ -185,7 +175,7 @@ def write_result_image(new_polygons, current_year, current_glacier, outpath):
     total = zip(new_polygons, current_year)
 
     for poly, year in total:
-        ax.plot(*poly[0].exterior.xy, alpha=0.3)
+        ax.plot(*poly[0].exterior.xy, alpha=0.4)
 
     ax.set_title(f'{current_glacier}')
 
@@ -194,7 +184,7 @@ def write_result_image(new_polygons, current_year, current_glacier, outpath):
     plt.close()
 
 def show_graph(new_polygons, new_lines):
-    fig, ax = plt.subplots(figsize=(20, 10))
+    fig, ax = plt.subplots(figsize=(10, 6))
 
     x = []
     y = []
@@ -214,7 +204,22 @@ def show_graph(new_polygons, new_lines):
     ax.set_ylabel('Frontal position change (metres)', fontsize=20)
     ax.set_title(f'Approximate frontal positions relative to earliest record\n({glacier})', fontsize=20)
 
-    ax.grid()
+    x_startdate = dt(1930, 1, 1)
+    x_enddate = dt(2030,1,1)
+
+    plt.axis([x_startdate, x_enddate, -13000, 1000])
+
+    yloc = YearLocator()
+    ax.xaxis.set_minor_locator(yloc)
+    ax.minorticks_on()
+    ax.grid(True)
+
+    ax.set_axisbelow(True)
+
+    # Customize the major grid
+    ax.grid(which='major', linestyle='-', linewidth='0.5', color='black')
+    # Customize the minor grid
+    ax.grid(which='minor', linestyle='dotted', linewidth='0.5', color='grey')
 
     ax.plot(df.loc[:])
     ax.scatter(df.index, df.iloc[:,0])
@@ -222,19 +227,37 @@ def show_graph(new_polygons, new_lines):
     plt.show()
 
 def write_graph(new_polygons, new_lines, outpath, df):
-    fig, ax = plt.subplots(figsize=(20, 10))
+    fig, ax = plt.subplots(figsize=(10, 6))
     glacier = new_lines[0]['properties']['gl_name']
  
     ax.set_xlabel('Year', fontsize=20)
     ax.set_ylabel('Frontal position change (metres)', fontsize=20)
     ax.set_title(f'Approximate frontal positions relative to earliest record\n({glacier})', fontsize=20)
 
-    ax.grid()
+    #ax.grid()
+
+    x_startdate = dt(1950, 1, 1)
+    x_enddate = dt(2030,1,1)
+
+    plt.axis([x_startdate, x_enddate, -13000, 1000])
+
+    yloc = YearLocator()
+    ax.xaxis.set_minor_locator(yloc)
+    ax.minorticks_on()
+    ax.grid(True)
+
+    ax.set_axisbelow(True)
+
+    # Customize the major grid
+    ax.grid(which='major', linestyle='-', linewidth='0.5', color='black')
+    # Customize the minor grid
+    ax.grid(which='minor', linestyle='dotted', linewidth='0.5', color='grey')
+
 
     ax.plot(df.index, df.iloc[:,0])
     ax.scatter(df.index, df.iloc[:,0])
 
-    graph_file = os.path.join(outpath, 'graphs', f'{glacier}_frontal_change.png')
+    graph_file = os.path.join(outpath, 'graphs', f'{glacier.lower().replace(" ", "_")}_frontal_change.png')
     plt.savefig(graph_file)
     plt.close(fig)
 
@@ -248,7 +271,8 @@ def write_graph(new_polygons, new_lines, outpath, df):
 @click.option('--write_result_images', is_flag=True, default=False, help='If set, writes images of the resulting polygons and fronts')
 @click.option('--write_graphs', is_flag=True, default=False, help='If set, saves .png of frontal change graphs')
 @click.option('--write_csv', is_flag=True, default=False, help='If set, writes certain data from all glaciers to csv')
-def main(boxes_path, lines_path, outpath, w, show_result_images, show_graphs, write_result_images, write_graphs, write_csv):
+@click.option('--invert', is_flag=True, default=False, help='If set, the program thinks the other side of the split lines is the important polygon.  Sometimes needed for curvilinear boxes.  Rectinlinear boxes should not need it if the box has been drawn starting on the upstream part of the glacier')
+def main(boxes_path, lines_path, outpath, w, show_result_images, show_graphs, write_result_images, write_graphs, write_csv, invert):
     
     if not (w==True):
             print('You will not write out the shapefiles')
@@ -260,7 +284,7 @@ def main(boxes_path, lines_path, outpath, w, show_result_images, show_graphs, wr
     for boxfile in all_boxfiles:
         glacier = os.path.basename(boxfile)
         linefile = os.path.join(lines_path, glacier)
-        result_lines, result_polygons, years, current_glacier, df_latest = box_process(boxfile, linefile, outpath, w)
+        result_lines, result_polygons, years, current_glacier, df_latest = box_process(boxfile, linefile, outpath, w, invert)
         if show_result_images:
             show_result_image(result_polygons, result_lines)
         if write_result_images:
